@@ -1,9 +1,508 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My App</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HabitFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #13131a;
+    --bg3: #1c1c26;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0f0f5;
+    --muted: #6b6b80;
+    --accent: #7c5cfc;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; max-width:480px; margin:0 auto; padding-bottom:90px; }
+
+  /* NAV */
+  .nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--bg2); border-top:1px solid var(--border); display:flex; justify-content:space-around; align-items:center; padding:10px 0 20px; z-index:100; }
+  .nav-btn { background:none; border:none; color:var(--muted); cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px; font-family:'DM Sans',sans-serif; font-size:11px; transition:color 0.2s; }
+  .nav-btn.active { color:var(--accent); }
+  .nav-btn svg { width:22px; height:22px; }
+  .nav-add { background:var(--accent); border:none; border-radius:50%; width:52px; height:52px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:white; margin-top:-20px; box-shadow:0 4px 20px rgba(124,92,252,0.5); transition:transform 0.2s; }
+  .nav-add:active { transform:scale(0.93); }
+
+  /* PAGES */
+  .page { display:none; padding:24px 16px; }
+  .page.active { display:block; }
+
+  /* HOME */
+  .greeting { font-size:13px; color:var(--muted); margin-bottom:2px; }
+  .page-title { font-family:'Syne',sans-serif; font-size:32px; font-weight:800; margin-bottom:2px; }
+  .page-sub { font-size:13px; color:var(--muted); margin-bottom:20px; }
+  .date-pill { display:inline-flex; align-items:center; gap:6px; background:var(--bg2); border:1px solid var(--border); border-radius:20px; padding:6px 14px; font-size:13px; color:var(--muted); margin-bottom:24px; }
+
+  /* HABIT CARD */
+  .habit-card { background:var(--bg2); border:1px solid var(--border); border-radius:20px; padding:18px; margin-bottom:14px; animation:fadeUp 0.4s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .habit-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .habit-name-row { display:flex; align-items:center; gap:10px; }
+  .habit-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+  .habit-name { font-family:'Syne',sans-serif; font-weight:700; font-size:17px; }
+  .habit-meta { font-size:12px; color:var(--muted); margin-left:22px; margin-bottom:14px; }
+  .habit-right { display:flex; align-items:center; gap:10px; }
+  .streak { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .delete-btn { background:rgba(255,255,255,0.05); border:none; border-radius:8px; padding:6px; cursor:pointer; color:var(--muted); display:flex; transition:background 0.2s; }
+  .delete-btn:hover { background:rgba(255,80,80,0.15); color:#ff6060; }
+
+  /* WEEK ROW */
+  .week-row { display:flex; gap:5px; margin-bottom:14px; }
+  .day-box { flex:1; aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:10px; color:rgba(255,255,255,0.3); font-weight:500; cursor:pointer; transition:transform 0.15s, opacity 0.2s; border:1px solid rgba(255,255,255,0.05); }
+  .day-box:hover { transform:scale(1.08); }
+  .day-box.done { color:white; opacity:1; border:none; }
+  .day-box.today { box-shadow:0 0 0 2px white; }
+
+  /* BOTTOM ROW */
+  .habit-bottom { display:flex; align-items:center; gap:12px; }
+  .progress-wrap { flex:1; }
+  .progress-bar-bg { height:4px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; }
+  .progress-bar-fill { height:100%; border-radius:4px; transition:width 0.6s ease; }
+  .pct-label { font-size:11px; color:var(--muted); margin-top:4px; }
+  .done-circle { width:52px; height:52px; border-radius:50%; border:2.5px solid; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.25s; flex-shrink:0; font-size:10px; font-weight:600; letter-spacing:0.3px; }
+  .done-circle.checked { color:white !important; }
+  .done-circle span { font-size:9px; text-align:center; line-height:1.2; }
+
+  /* ADD HABIT MODAL */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; display:none; align-items:flex-end; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--bg2); border-radius:24px 24px 0 0; padding:28px 20px 40px; width:100%; max-width:480px; border-top:1px solid var(--border); animation:slideUp 0.3s ease; }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  .modal h2 { font-family:'Syne',sans-serif; font-size:22px; font-weight:800; margin-bottom:20px; }
+  .modal label { font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
+  .modal input, .modal select { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:12px; padding:12px 14px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; margin-bottom:16px; outline:none; }
+  .modal input:focus, .modal select:focus { border-color:var(--accent); }
+  .color-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .color-opt { width:32px; height:32px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:border 0.2s, transform 0.2s; }
+  .color-opt.selected { border-color:white; transform:scale(1.15); }
+  .modal-btns { display:flex; gap:10px; }
+  .btn { flex:1; padding:14px; border-radius:14px; border:none; font-family:'Syne',sans-serif; font-weight:700; font-size:15px; cursor:pointer; transition:transform 0.15s; }
+  .btn:active { transform:scale(0.97); }
+  .btn-cancel { background:var(--bg3); color:var(--muted); }
+  .btn-save { background:var(--accent); color:white; }
+
+  /* STATS PAGE */
+  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:24px; }
+  .stat-card { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:16px; }
+  .stat-num { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; }
+  .stat-label { font-size:12px; color:var(--muted); margin-top:2px; }
+  .chart-card { background:var(--bg2); border:1px solid var(--border); border-radius:20px; padding:18px; margin-bottom:16px; }
+  .chart-title { font-family:'Syne',sans-serif; font-weight:700; font-size:15px; margin-bottom:16px; }
+  .chart-wrap { position:relative; height:200px; }
+
+  /* CALENDAR PAGE */
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:20px; }
+  .cal-day-label { text-align:center; font-size:11px; color:var(--muted); padding-bottom:4px; }
+  .cal-day { aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--muted); background:var(--bg2); border:1px solid var(--border); }
+  .cal-day.has-data { color:white; border:none; }
+  .cal-day.today-cal { box-shadow:0 0 0 2px var(--accent); }
+  .cal-legend { display:flex; gap:16px; flex-wrap:wrap; }
+  .cal-legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); }
+  .cal-legend-dot { width:10px; height:10px; border-radius:50%; }
+
+  /* SETTINGS PAGE */
+  .settings-section { background:var(--bg2); border:1px solid var(--border); border-radius:16px; overflow:hidden; margin-bottom:16px; }
+  .settings-item { padding:16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .settings-item:last-child { border-bottom:none; }
+  .settings-item-label { font-size:15px; }
+  .settings-item-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .toggle { width:44px; height:24px; background:var(--bg3); border-radius:12px; position:relative; cursor:pointer; border:1px solid var(--border); transition:background 0.2s; }
+  .toggle.on { background:var(--accent); }
+  .toggle-knob { width:18px; height:18px; background:white; border-radius:50%; position:absolute; top:2px; left:2px; transition:left 0.2s; }
+  .toggle.on .toggle-knob { left:22px; }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+  .empty-state svg { width:48px; height:48px; margin-bottom:12px; opacity:0.4; }
+  .empty-state p { font-size:14px; }
+</style>
 </head>
 <body>
-  <h1>Hello World!</h1>
+
+<!-- HOME PAGE -->
+<div class="page active" id="page-home">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+    <div>
+      <div class="greeting" id="greeting">Good morning, 👋</div>
+      <div class="page-title">My Habits</div>
+      <div class="page-sub">Small steps, big changes.</div>
+    </div>
+    <div class="date-pill">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span id="today-date"></span>
+    </div>
+  </div>
+
+  <div id="habits-list"></div>
+
+  <div class="empty-state" id="empty-state" style="display:none;">
+    <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    <p>No habits yet.<br>Tap + to add your first habit!</p>
+  </div>
+</div>
+
+<!-- STATS PAGE -->
+<div class="page" id="page-stats">
+  <div class="page-title" style="margin-bottom:6px;">Stats</div>
+  <div class="page-sub" style="margin-bottom:20px;">Your progress overview</div>
+  <div class="stats-grid" id="stats-grid"></div>
+  <div class="chart-card">
+    <div class="chart-title">Weekly completion (%)</div>
+    <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">Habit breakdown (last 30d)</div>
+    <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+  </div>
+</div>
+
+<!-- CALENDAR PAGE -->
+<div class="page" id="page-calendar">
+  <div class="page-title" style="margin-bottom:6px;">Calendar</div>
+  <div class="page-sub" style="margin-bottom:20px;">Activity this month</div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="cal-legend" id="cal-legend"></div>
+</div>
+
+<!-- SETTINGS PAGE -->
+<div class="page" id="page-settings">
+  <div class="page-title" style="margin-bottom:6px;">Settings</div>
+  <div class="page-sub" style="margin-bottom:20px;">Customize your experience</div>
+  <div class="settings-section">
+    <div class="settings-item">
+      <div><div class="settings-item-label">App Name</div><div class="settings-item-sub">HabitFlow</div></div>
+    </div>
+    <div class="settings-item">
+      <div><div class="settings-item-label">Dark Mode</div><div class="settings-item-sub">Always on</div></div>
+      <div class="toggle on"><div class="toggle-knob"></div></div>
+    </div>
+    <div class="settings-item">
+      <div><div class="settings-item-label">Reset All Data</div><div class="settings-item-sub">Clear all habits and logs</div></div>
+      <button onclick="resetAll()" style="background:rgba(255,80,80,0.15);border:none;color:#ff6060;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:13px;">Reset</button>
+    </div>
+  </div>
+  <div style="text-align:center;color:var(--muted);font-size:12px;margin-top:20px;">HabitFlow v1.0 · Built with ❤️</div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="showPage('home',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Habits
+  </button>
+  <button class="nav-btn" onclick="showPage('stats',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Stats
+  </button>
+  <button class="nav-add" onclick="openModal()">
+    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+  <button class="nav-btn" onclick="showPage('calendar',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Calendar
+  </button>
+  <button class="nav-btn" onclick="showPage('settings',this)">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    Settings
+  </button>
+</nav>
+
+<!-- ADD HABIT MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>Add New Habit</h2>
+    <label>Habit name</label>
+    <input type="text" id="habit-name" placeholder="e.g. Morning run, Study, Yoga..." />
+    <label>Description (optional)</label>
+    <input type="text" id="habit-desc" placeholder="e.g. 30 minutes, 20 pages..." />
+    <label>Color</label>
+    <div class="color-row" id="color-row"></div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveHabit()">Add Habit</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#7c5cfc','#4a9eff','#2ecc71','#ff6b35','#ff4eb8','#f9c74f','#06d6a0','#ef476f'];
+const DAY_LABELS = ['S','M','T','W','T','F','S'];
+
+let habits = JSON.parse(localStorage.getItem('hf_habits') || '[]');
+let logs = JSON.parse(localStorage.getItem('hf_logs') || '{}');
+let selectedColor = COLORS[0];
+let weekChartInst = null, donutChartInst = null;
+
+function save() {
+  localStorage.setItem('hf_habits', JSON.stringify(habits));
+  localStorage.setItem('hf_logs', JSON.stringify(logs));
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+function dateKey(date) { return date.toISOString().slice(0,10); }
+
+function getWeekDates() {
+  const today = new Date();
+  const day = today.getDay();
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - day + i);
+    dates.push(d);
+  }
+  return dates;
+}
+
+function getLast30Keys() {
+  const keys = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    keys.push(dateKey(d));
+  }
+  return keys;
+}
+
+function isLoggedToday(habitId) {
+  return !!(logs[todayKey()] && logs[todayKey()][habitId]);
+}
+
+function toggleLog(habitId) {
+  const key = todayKey();
+  if (!logs[key]) logs[key] = {};
+  logs[key][habitId] = !logs[key][habitId];
+  save();
+  renderHome();
+}
+
+function getStreak(habitId) {
+  let streak = 0;
+  const d = new Date();
+  while (true) {
+    const key = dateKey(d);
+    if (logs[key] && logs[key][habitId]) { streak++; d.setDate(d.getDate()-1); }
+    else break;
+  }
+  return streak;
+}
+
+function getPct(habitId) {
+  const keys = getLast30Keys();
+  let count = 0;
+  keys.forEach(k => { if (logs[k] && logs[k][habitId]) count++; });
+  return Math.round((count / 30) * 100);
+}
+
+function renderHome() {
+  const list = document.getElementById('habits-list');
+  const empty = document.getElementById('empty-state');
+  list.innerHTML = '';
+  if (!habits.length) { empty.style.display='block'; return; }
+  empty.style.display='none';
+  const weekDates = getWeekDates();
+  const todayIdx = new Date().getDay();
+
+  habits.forEach((h, i) => {
+    const done = isLoggedToday(h.id);
+    const streak = getStreak(h.id);
+    const pct = getPct(h.id);
+    const card = document.createElement('div');
+    card.className = 'habit-card';
+    card.style.animationDelay = (i*0.07)+'s';
+
+    const weekBoxes = weekDates.map((d, idx) => {
+      const key = dateKey(d);
+      const logged = logs[key] && logs[key][h.id];
+      const isToday = idx === todayIdx;
+      return `<div class="day-box${logged?' done':''}${isToday?' today':''}" 
+        style="${logged?'background:'+h.color+';':''}" 
+        title="${d.toDateString()}">${DAY_LABELS[idx]}</div>`;
+    }).join('');
+
+    card.innerHTML = `
+      <div class="habit-header">
+        <div class="habit-name-row">
+          <div class="habit-dot" style="background:${h.color}"></div>
+          <div class="habit-name">${h.name}</div>
+        </div>
+        <div class="habit-right">
+          <div class="streak">🔥 ${streak} day streak</div>
+          <button class="delete-btn" onclick="deleteHabit('${h.id}')">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </div>
+      ${h.desc ? `<div class="habit-meta">${h.desc}</div>` : '<div style="height:8px"></div>'}
+      <div class="week-row">${weekBoxes}</div>
+      <div class="habit-bottom">
+        <div class="progress-wrap">
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%;background:${h.color}"></div></div>
+          <div class="pct-label">${pct}% last 30d</div>
+        </div>
+        <div class="done-circle${done?' checked':''}" style="border-color:${h.color};${done?'background:'+h.color:''}" onclick="toggleLog('${h.id}')">
+          <span>${done?'✓':'Done\ntoday'}</span>
+        </div>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function renderStats() {
+  const keys30 = getLast30Keys();
+  const todayKey2 = todayKey();
+  const todayLogs = logs[todayKey2] || {};
+  const doneTodayCount = habits.filter(h => todayLogs[h.id]).length;
+  const totalPossible = habits.length * 30;
+  let totalDone = 0;
+  keys30.forEach(k => { habits.forEach(h => { if (logs[k] && logs[k][h.id]) totalDone++; }); });
+  const overallPct = totalPossible ? Math.round((totalDone/totalPossible)*100) : 0;
+  const maxStreak = habits.length ? Math.max(...habits.map(h => getStreak(h.id))) : 0;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-num" style="color:#7c5cfc">${doneTodayCount}/${habits.length}</div><div class="stat-label">Done today</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#2ecc71">${overallPct}%</div><div class="stat-label">Overall rate</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#f9c74f">${maxStreak}</div><div class="stat-label">Best streak</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#4a9eff">${habits.length}</div><div class="stat-label">Total habits</div></div>`;
+
+  // Weekly chart
+  const last7 = [];
+  const last7labels = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const k = dateKey(d);
+    const cnt = habits.filter(h => logs[k] && logs[k][h.id]).length;
+    const pct2 = habits.length ? Math.round((cnt/habits.length)*100) : 0;
+    last7.push(pct2);
+    last7labels.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
+  }
+  if (weekChartInst) weekChartInst.destroy();
+  const wctx = document.getElementById('weekChart').getContext('2d');
+  weekChartInst = new Chart(wctx, {
+    type:'line',
+    data:{ labels:last7labels, datasets:[{ data:last7, borderColor:'#7c5cfc', backgroundColor:'rgba(124,92,252,0.15)', tension:0.4, fill:true, pointBackgroundColor:'#7c5cfc', pointRadius:4 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#6b6b80',font:{size:11}}}, y:{grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#6b6b80',font:{size:11}},min:0,max:100} } }
+  });
+
+  // Donut chart
+  if (donutChartInst) donutChartInst.destroy();
+  const dctx = document.getElementById('donutChart').getContext('2d');
+  if (habits.length) {
+    donutChartInst = new Chart(dctx, {
+      type:'doughnut',
+      data:{ labels:habits.map(h=>h.name), datasets:[{ data:habits.map(h=>getPct(h)), backgroundColor:habits.map(h=>h.color), borderWidth:0, hoverOffset:6 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ color:'#6b6b80', font:{size:11}, padding:12, boxWidth:10 } } }, cutout:'65%' }
+    });
+  }
+}
+
+function renderCalendar() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayNum = now.getDate();
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = DAY_LABELS.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+
+  for (let i = 0; i < firstDay; i++) grid.innerHTML += `<div></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const key = dateKey(date);
+    const dayLogs = logs[key] || {};
+    const count = habits.filter(h => dayLogs[h.id]).length;
+    const isToday = d === todayNum;
+    let bg = '';
+    if (count > 0 && habits.length > 0) {
+      const ratio = count / habits.length;
+      if (ratio >= 0.8) bg = '#2ecc71';
+      else if (ratio >= 0.5) bg = '#f9c74f';
+      else bg = '#ff6b35';
+    }
+    grid.innerHTML += `<div class="cal-day${count>0?' has-data':''}${isToday?' today-cal':''}" style="${bg?'background:'+bg+';':''}" title="${count}/${habits.length} habits">${d}</div>`;
+  }
+
+  document.getElementById('cal-legend').innerHTML = `
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#2ecc71"></div>80%+ done</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#f9c74f"></div>50-79%</div>
+    <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#ff6b35"></div>Below 50%</div>`;
+}
+
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name==='stats') renderStats();
+  if (name==='calendar') renderCalendar();
+}
+
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('habit-name').value='';
+  document.getElementById('habit-desc').value='';
+  selectedColor = COLORS[0];
+  renderColorRow();
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+
+function renderColorRow() {
+  document.getElementById('color-row').innerHTML = COLORS.map(c =>
+    `<div class="color-opt${c===selectedColor?' selected':''}" style="background:${c}" onclick="selectColor('${c}')"></div>`
+  ).join('');
+}
+
+function selectColor(c) { selectedColor=c; renderColorRow(); }
+
+function saveHabit() {
+  const name = document.getElementById('habit-name').value.trim();
+  if (!name) { document.getElementById('habit-name').focus(); return; }
+  habits.push({ id: Date.now().toString(), name, desc: document.getElementById('habit-desc').value.trim(), color: selectedColor });
+  save(); closeModal(); renderHome();
+}
+
+function deleteHabit(id) {
+  if (!confirm('Delete this habit?')) return;
+  habits = habits.filter(h => h.id !== id);
+  save(); renderHome();
+}
+
+function resetAll() {
+  if (!confirm('Reset ALL data? This cannot be undone.')) return;
+  habits=[]; logs={}; save(); renderHome();
+}
+
+// Init
+function init() {
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
+  document.getElementById('greeting').textContent = greet + ' 👋';
+  document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  // Default habits if empty
+  if (!habits.length) {
+    const defaults = [
+      {name:'Gym',desc:'45 minutes',color:'#7c5cfc'},
+      {name:'Study',desc:'2 hours',color:'#4a9eff'},
+      {name:'Wake up early',desc:'Before 6:30 AM',color:'#f9c74f'},
+      {name:'Yoga',desc:'20 minutes',color:'#2ecc71'},
+    ];
+    defaults.forEach(d => habits.push({id:Date.now().toString()+Math.random(), ...d}));
+    save();
+  }
+
+  renderColorRow();
+  renderHome();
+  document.getElementById('modal').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+}
+init();
+</script>
 </body>
 </html>
